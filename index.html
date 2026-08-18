@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="主日聚會情況分析工具：Excel 僅於瀏覽器本機讀取，不上傳伺服器。" />
+  <title>主日聚會情況分析</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">LOCAL EXCEL DASHBOARD</p>
+      <h1>主日聚會情況分析</h1>
+      <p class="subtitle">匯入當次 Excel，在瀏覽器本機完成分析；重新整理或清除後即移除資料。</p>
+    </div>
+    <button id="clearBtn" class="btn ghost" type="button" disabled>清除本次資料</button>
+  </header>
+
+  <main>
+    <section class="panel upload-panel" id="uploadPanel">
+      <div class="upload-copy">
+        <h2>匯入 Excel</h2>
+        <p>支援你目前系統匯出的 <strong>.xls</strong>，也支援 .xlsx。網頁只讀取你當次選擇的檔案。</p>
+        <p class="privacy"><span aria-hidden="true">🔒</span> 本工具不使用 localStorage / IndexedDB，也沒有資料上傳程式。</p>
+      </div>
+      <label class="file-button" for="fileInput">選擇 Excel</label>
+      <input id="fileInput" type="file" accept=".xls,.xlsx,.xlsm,.csv" hidden />
+      <p class="file-name" id="fileName">尚未選擇檔案</p>
+      <p class="error" id="errorMessage" role="alert"></p>
+    </section>
+
+    <section id="dashboard" class="dashboard hidden">
+      <section class="panel info-strip">
+        <div><span>檔案</span><strong id="infoFile">—</strong></div>
+        <div><span>資料期間</span><strong id="infoPeriod">—</strong></div>
+        <div><span>週次</span><strong id="infoWeeks">—</strong></div>
+        <div><span>人數</span><strong id="infoPeople">—</strong></div>
+      </section>
+
+      <section class="panel rules-panel">
+        <div>
+          <p class="eyebrow">分析規則</p>
+          <h2>目前聚會狀況</h2>
+          <p id="ruleText">以匯入資料中最新的主日為基準，累計最近 6／8／10／12／16 週。</p>
+        </div>
+        <div class="period-controls">
+          <label class="field compact"><span>觀察週數</span><select id="windowSelect">
+            <option value="6">最近 6 週</option>
+            <option value="8">最近 8 週</option>
+            <option value="10">最近 10 週</option>
+            <option value="12" selected>最近 12 週</option>
+            <option value="16">最近 16 週</option>
+          </select></label>
+        </div>
+        <div class="rule-legend">
+          <span><i class="dot weekly"></i>週週聚會：近 12 週每週都有聚會</span>
+          <span><i class="dot regular"></i>常聚會：平均至少每 3 週一次</span>
+          <span><i class="dot occasional"></i>偶聚會：平均至少每 4 週一次</span>
+          <span><i class="dot sporadic"></i>零星聚會：最近 8 週內仍有出現</span>
+          <span><i class="dot inactive"></i>近期未聚會：超過 8 週未聚會</span>
+        </div>
+      </section>
+
+      <section class="cards" id="summaryCards"></section>
+
+      <section class="grid two-col">
+        <article class="panel">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">DISTRIBUTION</p>
+              <h2>整體聚會情況</h2>
+            </div>
+          </div>
+          <div id="overallBar" class="overall-bar" aria-label="整體聚會情況比例"></div>
+          <div id="overallLegend" class="overall-legend"></div>
+        </article>
+
+        <article class="panel">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">BY DISTRICT</p>
+              <h2>大區比較</h2>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table id="districtTable">
+              <thead>
+                <tr><th>大區</th><th>總人數</th><th>初信</th><th>日期不明</th><th>週週聚會</th><th>常聚會</th><th>偶聚會</th><th>零星</th><th>近期未聚會</th><th>穩定聚會率</th></tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+
+      <section class="panel">
+        <div class="section-head filters-head">
+          <div>
+            <p class="eyebrow">PEOPLE</p>
+            <h2>人員明細</h2>
+          </div>
+          <div class="filters">
+            <label class="field"><span>搜尋姓名</span><input id="searchInput" type="search" placeholder="輸入姓名" /></label>
+            <label class="field"><span>大區</span><select id="districtFilter"><option value="">全部</option></select></label>
+            <label class="field"><span>小區</span><select id="smallDistrictFilter"><option value="">全部</option></select></label>
+            <div class="field group-field">
+              <span>羣組</span>
+              <details class="multi-select" id="groupMultiSelect">
+                <summary id="groupFilterSummary">全部</summary>
+                <div class="multi-panel">
+                  <div class="group-presets">
+                    <button type="button" class="preset-btn" data-group-preset="all">全部</button>
+                    <button type="button" class="preset-btn" data-group-preset="college-youth">大專＋青職</button>
+                    <button type="button" class="preset-btn" data-group-preset="teen">青少年</button>
+                    <button type="button" class="preset-btn" data-group-preset="student">學生專項</button>
+                    <button type="button" class="preset-btn" data-group-preset="child">兒童</button>
+                  </div>
+                  <div class="group-options" id="groupFilterOptions"></div>
+                  <div class="multi-actions">
+                    <button type="button" id="clearGroupFilter" class="link-btn">清除選擇</button>
+                    <button type="button" id="closeGroupFilter" class="primary-small">完成</button>
+                  </div>
+                </div>
+              </details>
+            </div>
+            <label class="field"><span>聚會情況</span><select id="statusFilter"><option value="">全部</option></select></label>
+            <label class="field"><span>初信</span><select id="newBelieverFilter"><option value="">全部</option><option value="yes">初信</option><option value="no">非初信</option><option value="unknown">日期不明</option></select></label>
+          </div>
+        </div>
+        <div class="result-count" id="resultCount"></div>
+        <div class="table-wrap people-table-wrap">
+          <table id="peopleTable">
+            <thead>
+              <tr>
+                <th>大區</th><th>小區</th><th>姓名</th><th>羣組</th><th>受浸日期</th><th>初信</th><th>聚會情況</th><th>最近一次聚會日期</th><th>近期出席</th><th>近期出席率</th><th>全部出席</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <footer>
+    <p>資料僅存在本頁記憶體中。關閉、重新整理或按「清除本次資料」後，本次匯入內容不會由本工具保存。</p>
+  </footer>
+
+  <!-- 第一版使用 SheetJS 官方 CDN 以支援舊式 .xls。正式部署可依 README 改為本機 vendor 檔。 -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
